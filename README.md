@@ -9,7 +9,9 @@ have a message callback function that you pass into it.
 
 ## Features
 1. Subscriber functionality
+
 ~~2. Publisher functionality (coming soon)~~
+
 ~~3. Test using mock service (TBA)~~
 
 ## Usage
@@ -24,8 +26,16 @@ and implementation.
 
 ## Example
 ```
- var amqpService = require('./rabbit.client.js');
- var config = require('./test/testData').testConfig;
+ var subscriber = require('amqplib-lite');
+ var config = {
+    rabbitmqserver: 'dev.rabbitmq.com',
+    rabbitmqport: '',
+    rabbitmqusername: '',
+    rabbitmqpassword: '',
+    subscribeexchange: 'testExchange',
+    vhost: ''
+
+ };
 
  function testProcess1(msg) {
      var data = JSON.parse(msg.content.toString());
