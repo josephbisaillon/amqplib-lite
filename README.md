@@ -7,6 +7,8 @@ All implementation is built into the listener service, simply use listener.start
 One connection is used per client instance, this connection can open up multiple channels, each channel is a connection to one Queue and will
 have a message callback function that you pass into it. 
 
+## [Documentation](https://github.com/username/repo/blob/branch/docs/more_words.md)
+
 ## Features
 1. Subscriber functionality
 
