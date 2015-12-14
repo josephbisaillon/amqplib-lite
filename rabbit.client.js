@@ -1,7 +1,6 @@
 var amqp = require('amqplib/callback_api');
 var util = require('./rabbit.util.js');
 var Q = require('q');
-var amqpConn = null; // Connection object to be used to subscribe to the Q
 var logger = {};
 
 /**
@@ -31,7 +30,7 @@ var logger = {};
  * client.start(handlers,config);
  *
  */
-function Listener(customLogger){
+function Connect(customLogger) {
     logger = customLogger || require('./loggerService.js');
 }
 
@@ -65,40 +64,39 @@ function Listener(customLogger){
  * @param {RabbitHandlers} handlers - Array of callback handlers WITH configuration for those handlers, one handler per channel
  * @param {RabbitConfiguration} config - must pass a {@link RabbitConfiguration} object
  */
-Listener.prototype.start = function (handlers,config) {
-    amqp.connect(util.buildRabbitMqUrl(config), function (err, conn) {//'amqp://ADMIN_TEST:Nreca123!@vavt-soa-rmq01:5672/GEMS-TEST'
 
-
+Connect.prototype.connect = function (config) {
+    return Q.ninvoke(amqp, "connect", util.buildRabbitMqUrl(config)).then(function (conn) {
         logger.info("Connection in progress...");
 
-        if (err) {
-            console.error("[AMQP]", err.message);
-            logger.error("[AMQP] " + err.message);
-            return setTimeout(start, 1000);
-        }
+
 
         conn.on("error", function (err) {
             if (err.message !== "Connection closing") {
                 console.error("[AMQP] conn error", err.message);
                 logger.error("[AMQP] " + err.message);
+                conn.close();
             }
         });
 
         conn.on("close", function () {
             console.error("[AMQP] reconnecting");
             logger.error("[AMQP] reconnecting");
-            return setTimeout(start, 1000);
+
+            return setTimeout(connect, 1000);
         });
 
         console.log("[AMQP] connected");
         logger.info("[AMQP] has connected successfully");
-        amqpConn = conn;
+        return conn;
 
+    }).catch(function (err) {
+        console.error("[AMQP]", err.message);
+        logger.error("[AMQP] " + err.message);
+        return setTimeout(connect, 1000);
 
-        // After a successful connection run the channel queue connections
-        whenConnected(handlers);
     });
-}
+};
 
 /**
  * A Channel object, part of the amqplib. Search amqplib documentation for more information
@@ -109,9 +107,10 @@ Listener.prototype.start = function (handlers,config) {
  * Sets up a channel object to be used
  * @memberof Listener
  * @param {number} messageRate - number of messages that will be fetched at a time. server must receive ack before it will pass more.
+ * @param {Connection} amqpConn - xxxxxx
  * @returns {Promise<Channel>} - channel object that can be used to request messages and response
  */
-function setUpListener(messageRate) {
+function setUpListener(messageRate, amqpConn) {
     return Q.ninvoke(amqpConn, 'createChannel').then(function (ch) {
 
         ch.on("error", function (err) {
@@ -133,38 +132,23 @@ function setUpListener(messageRate) {
  * @memberof Listener
  * @param {array} handlers - Takes in an array of confuration settings to loop through and create queue connections for
  */
-function whenConnected(handlers) {
+Connect.prototype.registerHandlers = function (handlers, amqpConn) {
     logger.info("[AMQP] Beginning channel connections");
-    handlers.forEach(function (handler){
+    handlers.forEach(function (handler) {
         logger.info("[AMQP] attempting queue listener handshake for " + handler.queueConfig);
-        setUpListener(handler.messageRate)
+        setUpListener(handler.messageRate, amqpConn)
             .then(function (ch) {
                 logger.info("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
                 ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
             }).catch(function (err) {
             if (err) {
-                console.log(err)
+                console.log(err);
                 logger.fatal("[AMQP] " + err.message);
-                closeOnErr(err.message);
+
             }
         });
     });
 
-}
+};
 
-/**
- * Handle amqp connection errors
- * Dispose of the amqp connection properly to prevent memeory leaks
- * @memberof Listener
- * @param {String} err - the message that will be used for logging
- * @returns {boolean}
- */
-function closeOnErr(err) {
-    if (!err) return false;
-
-    logger.error(err);
-    amqpConn.close();
-    return true;
-}
-
-module.exports = Listener;
+module.exports = Connect;
