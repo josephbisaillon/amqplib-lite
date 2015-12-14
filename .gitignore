@@ -8,7 +8,6 @@
 
 # Don't commit dependencies!
 node_modules
-jsdoc_build
 
 # Generated files
 tmp
