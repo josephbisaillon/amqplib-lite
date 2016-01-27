@@ -66,6 +66,8 @@ function Connect(customLogger) {
  */
 
 Connect.prototype.connect = function (config) {
+    var context = this;
+
     return Q.ninvoke(amqp, "connect", util.buildRabbitMqUrl(config)).then(function (conn) {
         logger.info("Connection in progress...");
 
@@ -83,7 +85,7 @@ Connect.prototype.connect = function (config) {
             console.error("[AMQP] reconnecting");
             logger.error("[AMQP] reconnecting");
 
-            return setTimeout(connect, 1000);
+            return setTimeout(context.connect, 1000);
         });
 
         console.log("[AMQP] connected");
@@ -93,7 +95,7 @@ Connect.prototype.connect = function (config) {
     }).catch(function (err) {
         console.error("[AMQP]", err.message);
         logger.error("[AMQP] " + err.message);
-        return setTimeout(connect, 1000);
+        return setTimeout(context.connect, 1000);
 
     });
 };
