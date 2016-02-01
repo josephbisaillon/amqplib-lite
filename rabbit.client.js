@@ -83,7 +83,7 @@ Connect.prototype.connect = function (config) {
             console.error("[AMQP] reconnecting");
             logger.error("[AMQP] reconnecting");
 
-            return setTimeout(context.connect(config), 1000);
+            return setTimeout(context.connect, 1000);
         });
 
         console.log("[AMQP] connected");
@@ -93,7 +93,7 @@ Connect.prototype.connect = function (config) {
     }).catch(function (err) {
         console.error("[AMQP]", err.message);
         logger.error("[AMQP] " + err.message);
-        return setTimeout(context.connect(config), 1000);
+        return setTimeout(context.connect, 1000);
 
     });
 };
@@ -149,6 +149,25 @@ Connect.prototype.registerHandlers = function (handlers, amqpConn) {
         });
     });
 
+};
+
+Connect.prototype.registerPublishers = function(handler, amqpConn){
+    logger.info("[AMQP] Beginning publisher connections");
+    var publishers = {};
+    handlers.forEach(function (handler) {
+        logger.info("[AMQP] attempting publisher handshake for " + handler.queueConfig);
+        createChannel(amqpConn)
+            .then(function (ch) {
+                logger.info("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
+                publishers[handler.publisherExchange] = ch;
+            }).catch(function (err) {
+            if (err) {
+                console.log(err);
+                logger.fatal("[AMQP] " + err.message);
+            }
+        });
+    });
+    return publishers;
 };
 
 module.exports = Connect;
