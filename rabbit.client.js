@@ -83,7 +83,7 @@ Connect.prototype.connect = function (config) {
             console.error("[AMQP] reconnecting");
             logger.error("[AMQP] reconnecting");
 
-            return setTimeout(context.connect, 1000);
+            return setTimeout(function() {context.connect(config)}, 1000);
         });
 
         console.log("[AMQP] connected");
@@ -93,7 +93,7 @@ Connect.prototype.connect = function (config) {
     }).catch(function (err) {
         console.error("[AMQP]", err.message);
         logger.error("[AMQP] " + err.message);
-        return setTimeout(context.connect, 1000);
+        return setTimeout(function() {context.connect(config)}, 1000);
 
     });
 };
