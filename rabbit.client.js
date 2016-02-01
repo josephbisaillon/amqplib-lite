@@ -2,7 +2,7 @@ var amqp = require('amqplib/callback_api');
 var util = require('./rabbit.util.js');
 var Q = require('q');
 var logger = {};
-
+var registeredHandlers = {};
 /**
  * The configuration object that must be passed for an amqp connection string to be properly built
  * @typedef {Object} customLogger
@@ -32,6 +32,7 @@ var logger = {};
  */
 function Connect(customLogger) {
     logger = customLogger || require('./loggerService.js');
+
 }
 
 /**
@@ -83,7 +84,11 @@ Connect.prototype.connect = function (config) {
             console.error("[AMQP] reconnecting");
             logger.error("[AMQP] reconnecting");
 
-            return setTimeout(function() {context.connect(config)}, 1000);
+            return setTimeout(function() {
+                context.connect(config).then(function(conn){
+                    context.registerHandlers(context.handlers, conn);
+                })
+            }, 1000);
         });
 
         console.log("[AMQP] connected");
@@ -93,7 +98,11 @@ Connect.prototype.connect = function (config) {
     }).catch(function (err) {
         console.error("[AMQP]", err.message);
         logger.error("[AMQP] " + err.message);
-        return setTimeout(function() {context.connect(config)}, 1000);
+        return setTimeout(function() {
+            context.connect(config).then(function(conn){
+                context.registerHandlers(context.handlers, conn);
+            })
+        }, 1000);
 
     });
 };
@@ -110,7 +119,8 @@ Connect.prototype.connect = function (config) {
  * @param {Connection} amqpConn - xxxxxx
  * @returns {Promise<Channel>} - channel object that can be used to request messages and response
  */
-function setUpListener(messageRate, amqpConn) {
+Connect.prototype.setUpListener = function(messageRate, amqpConn) {
+    var context = this;
     return Q.ninvoke(amqpConn, 'createChannel').then(function (ch) {
 
         ch.on("error", function (err) {
@@ -120,6 +130,8 @@ function setUpListener(messageRate, amqpConn) {
         ch.on("close", function () {
             console.log("[AMQP] Channel closed");
             logger.info("[AMQP] Channel closed");
+
+            context.registerHandlers(registeredHandlers,amqpConn);
         });
         logger.info("[AMQP] Channel prefetch rate set to " + messageRate);
         ch.prefetch(messageRate); // limit the number of messages that are read to 1, once the server receives an acknowledgement back it will then send another
@@ -133,10 +145,16 @@ function setUpListener(messageRate, amqpConn) {
  * @param {array} handlers - Takes in an array of confuration settings to loop through and create queue connections for
  */
 Connect.prototype.registerHandlers = function (handlers, amqpConn) {
+    var context = this;
     logger.info("[AMQP] Beginning channel connections");
-    handlers.forEach(function (handler) {
+    registeredHandlers = handlers;
+    if(registeredHandlers){
+        console.log("[AMQP] Set handlers " ,JSON.stringify(registeredHandlers));
+    }
+
+    registeredHandlers.forEach(function (handler) {
         logger.info("[AMQP] attempting queue listener handshake for " + handler.queueConfig);
-        setUpListener(handler.messageRate, amqpConn)
+        context.setUpListener(handler.messageRate, amqpConn)
             .then(function (ch) {
                 logger.info("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
                 ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
