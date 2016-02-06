@@ -13,13 +13,14 @@ var testConfig = {
     rabbitmqusername: '',
     rabbitmqpassword: '',
     subscribeexchange: 'testExchange',
-    vhost: ''
+    vhost: '',
+    heartbeat: 60
 
 };
 var testData = {
     testHandlers: handlers,
     testConfig: testConfig
-}
+};
 
 function testFunctionOne(msg) {
     console.log(msg);

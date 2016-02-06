@@ -37,11 +37,13 @@ var service = {
  */
 function buildRabbitMqUrl(config){
     var auth = '';
+    var heartbeat = config.rabbitheartbeat || 0;
     if((config.rabbitmqusername + config.rabbitmqpassword) != ''){
         auth = config.rabbitmqusername + ':' + config.rabbitmqpassword + '@';
     }
-    console.log('amqp://' + auth + config.rabbitmqserver + ':' + config.rabbitmqport + '/' + config.vhost);
-    return 'amqp://' + auth + config.rabbitmqserver + ':' + config.rabbitmqport + '/' + config.vhost;
+
+    console.log('amqp://' + auth + config.rabbitmqserver + ':' + config.rabbitmqport + '/' + config.vhost + '?heartbeat=' + heartbeat);
+    return 'amqp://' + auth + config.rabbitmqserver + ':' + config.rabbitmqport + '/' + config.vhost + '?heartbeat=' + heartbeat;
 }
 
 /**
