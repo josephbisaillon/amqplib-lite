@@ -169,23 +169,50 @@ Connect.prototype.registerHandlers = function (handlers, amqpConn) {
 
 };
 
-Connect.prototype.registerPublishers = function(handler, amqpConn){
-    logger.info("[AMQP] Beginning publisher connections");
-    var publishers = {};
-    handlers.forEach(function (handler) {
-        logger.info("[AMQP] attempting publisher handshake for " + handler.queueConfig);
-        createChannel(amqpConn)
-            .then(function (ch) {
-                logger.info("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
-                publishers[handler.publisherExchange] = ch;
-            }).catch(function (err) {
+Connect.prototype.registerPublisher = function(config, amqpConn){
+    return new Promise(function(resolve, reject) {
+        logger.info("[AMQP] Beginning publisher connections");
+        logger.info("[AMQP] attempting publisher handshake for new channel to publish on " + config.publisherExchange);
+        amqpConn.createChannel((err, ch) => {
             if (err) {
-                console.log(err);
-                logger.fatal("[AMQP] " + err.message);
+            logger.error('no channel');
+            return reject(err);
+        }
+
+        ch.checkExchange(config.publisherExchange, function (err, ok) {
+            if (err) {
+                logger.error('[AMQP] error finding exchange ' + config.publisherExchange);
+            } else {
+                logger.info('[AMQP] success finding exchange ' + config.publisherExchange);
+                resolve(ch);
+
             }
         });
     });
-    return publishers;
+
+        /**configs.forEach(function (config) {
+      logger.info("[AMQP] attempting publisher handshake for new channel to publish on " + config.publisherExchange);
+      amqpConn.createChannel((err, ch) => {
+        if (err) {
+          logger.error('no channel');
+          return reject(err);
+        }
+
+        ch.checkExchange(config.publisherExchange, function (err, ok) {
+          if (err) {
+            logger.error('[AMQP] error finding exchange ' + config.publisherExchange);
+          } else {
+            logger.info('[AMQP] success finding exchange ' + config.publisherExchange);
+            publishers[config.publisherExchange] = ch;
+            console.log(publishers[config.publisherExchange]);
+          }
+        });
+
+      });
+    });
+         return resolve(publishers);
+         **/
+    });
 };
 
 module.exports = Connect;

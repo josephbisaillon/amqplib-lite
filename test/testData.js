@@ -7,6 +7,11 @@ var handlers = [{
     queueConfig: 'theQueue2',
     messageRate: 1
 }];
+
+publisherConfigs = [{
+    publisherExchange: ''
+}];
+
 var testConfig = {
     rabbitmqserver: 'dev.rabbitmq.com',
     rabbitmqport: '',
