@@ -22,12 +22,22 @@ var registeredHandlers = {};
  * var subscriber = require('amqplib-lite');
  *
  * // Custom logger passed in
- * var client = new subscriber(customLogObj);
- * client.start(handlers,config);
+ * let client = new RabbitClient(customLogObj);
+ * client.handlers = handlers; // when a disconnect happens this handler property will be used to reconnect internally
+ * client.connect(config).then((connection) => {
+ *    client.registerHandlers(handlers, connection);
+ * }).catch(error => {
+ *   logger.error("Error occurred while bootstrapping queue handlers: ", error);
+ * });
  *
  * // No custom logger pass in
- * var client = new subscriber();
- * client.start(handlers,config);
+ * let client = new RabbitClient();
+ * client.handlers = handlers; // when a disconnect happens this handler property will be used to reconnect internally
+ * client.connect(config).then((connection) => {
+ *    client.registerHandlers(handlers, connection);
+ * }).catch(error => {
+ *   logger.error("Error occurred while bootstrapping queue handlers: ", error);
+ * });
  *
  */
 function Connect(customLogger) {
@@ -55,7 +65,7 @@ function Connect(customLogger) {
  * @property {Number} rabbitmqport - RabbitMqServer Port.
  * @property {String} rabbitmqusername - RabbitMqServer username.
  * @property {String} rabbitmqpassword - RabbitMqServer password.
- * @property {String} subscribequeue - RabbitMqServer queue that you wish to subscribe to.
+ * @property {Number} rabbitheartbeat - optional, sets the client heartbeat with the server. Helps prevent TCP timeouts if rabbit server does not have heartbeat service enabled
  * @property {String} vhost - RabbitMqServer vhost.
  */
 
@@ -169,11 +179,16 @@ Connect.prototype.registerHandlers = function (handlers, amqpConn) {
 
 };
 
+/**
+ * Used to register new channels on connections that exist, it also checks that the publishing exchange is reachable
+ * @param config
+ * @param amqpConn
+ */
 Connect.prototype.registerPublisher = function(config, amqpConn){
     return new Promise(function(resolve, reject) {
         logger.info("[AMQP] Beginning publisher connections");
         logger.info("[AMQP] attempting publisher handshake for new channel to publish on " + config.publisherExchange);
-        amqpConn.createChannel((err, ch) => {
+        amqpConn.createChannel(function(err, ch) {
             if (err) {
             logger.error('no channel');
             return reject(err);
@@ -189,29 +204,6 @@ Connect.prototype.registerPublisher = function(config, amqpConn){
             }
         });
     });
-
-        /**configs.forEach(function (config) {
-      logger.info("[AMQP] attempting publisher handshake for new channel to publish on " + config.publisherExchange);
-      amqpConn.createChannel((err, ch) => {
-        if (err) {
-          logger.error('no channel');
-          return reject(err);
-        }
-
-        ch.checkExchange(config.publisherExchange, function (err, ok) {
-          if (err) {
-            logger.error('[AMQP] error finding exchange ' + config.publisherExchange);
-          } else {
-            logger.info('[AMQP] success finding exchange ' + config.publisherExchange);
-            publishers[config.publisherExchange] = ch;
-            console.log(publishers[config.publisherExchange]);
-          }
-        });
-
-      });
-    });
-         return resolve(publishers);
-         **/
     });
 };
 

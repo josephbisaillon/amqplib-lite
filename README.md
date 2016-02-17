@@ -2,17 +2,17 @@
 
 Use this lightweight library to integrate with rabbitmq. 
 
-All implementation is built into the listener service, simply use listener.start and pass it your configuration
+All implementation is built into the listener service.
 
 One connection is used per client instance, this connection can open up multiple channels, each channel is a connection to one Queue and will
-have a message callback function that you pass into it. 
+have a message callback function that you pass into it. The callback function for the has a channel binded tied to it for publishing.
 
 ## [Documentation](https://cdn.rawgit.com/josephbisaillon/amqplib-lite/master/jsdoc_build/docs/index.html)
 
 ## Features
 1. Subscriber functionality
 
-~~2. Publisher functionality (coming soon)~~
+2. Publisher functionality
 
 ~~3. Test using mock service (TBA)~~
 
@@ -23,6 +23,7 @@ have a message callback function that you pass into it.
 ## Example
 ```
  var subscriber = require('amqplib-lite');
+ 
  var config = {
     rabbitmqserver: 'dev.rabbitmq.com',
     rabbitmqport: '',
@@ -32,33 +33,43 @@ have a message callback function that you pass into it.
     vhost: ''
 
  };
-
+ 
+ // This handler function will response to the ack or reject the message based on business logic. It will also publish to an exchange using the existing
+ // channel connection that exists in the context of the handler. 
  function testProcess1(msg) {
-     var data = JSON.parse(msg.content.toString());
-     console.log(JSON.stringify(data));
-     try {
-
-         //TODO: Add implementation to update mongo
-
-         // Respond that the message has been received and processed to the server, once this is sent the message will be deleted from the Queue
-         this.ack(msg, true);
-     } catch (err) {
-         this.reject(msg, true);
+     var context = this;
+     
+     function publishResponseToExchange(Response){
+               var publishConfigs = { 
+                              PUBLISH_EXCHANGE: 'Events.Status.Exchange',
+                              PUBLISH_AUDIT_KEY: 'NAT' };
+                                            
+              var ok = context.publish(publishConfigs.PUBLISH_EXCHANGE, publishConfigs.PUBLISH_AUDIT_KEY, new Buffer(Response));
+              
+              if (ok){
+              console.log('published successfully');
+              } else {
+              console.log('publish failed');
+              }
      }
- }
-
- function testProcess2(msg) {
+     
      var data = JSON.parse(msg.content.toString());
      console.log(JSON.stringify(data));
      try {
 
          //TODO: Add implementation to update mongo
 
+         // You can send a message now to an exchange that your processing worked or some other dependent message.
+         publishResponseToExchange('HELLO WORLD');
+         
          // Respond that the message has been received and processed to the server, once this is sent the message will be deleted from the Queue
-         this.ack(msg, true);
+         context.ack(msg, true);
      } catch (err) {
-        this.reject(msg, true);
-        // console.log(err);
+         // you can publish a message on failures now to notify other systems, etc.
+         publishResponseToExchange('I FAILED :(');
+            
+         // reject the message, an error happened during processing
+         context.reject(msg, true);
      }
  }
 
@@ -79,21 +90,28 @@ have a message callback function that you pass into it.
      handlerFunction: testProcess1,
      queueConfig: 'Your.First.Queue',
      messageRate: 1
- }, {
-     handlerFunction: testProcess2,
-     queueConfig: 'Your.Second.Queue',
-     messageRate: 1
  }];
  
- // Custom logger passed in
- var client = new amqpService(customLogObj);
- client.start(handlers,config);
+// Custom logger passed in
+let client = new RabbitClient(logger);
+client.handlers = handlers; // when a disconnect happens this handler property will be used to reconnect internally
+client.connect(config).then((connection) => {
+    client.registerHandlers(handlers, connection);
+}).catch(error => {
+    logger.error("Error occurred while bootstrapping queue handlers: ", error);
+});
+
  
  // No custom logger pass in
- var client = new amqpService();
- client.start(handlers,config);
+let client = new RabbitClient();
+client.handlers = handlers; // when a disconnect happens this handler property will be used to reconnect internally
+client.connect(config).then((connection) => {
+    client.registerHandlers(handlers, connection);
+}).catch(error => {
+    logger.error("Error occurred while bootstrapping queue handlers: ", error);
+});
  
 ```
 
 ## Contact
-If you have any questions contact Joseph Bisallon
+If you have any questions contact Joseph Bisaillon
