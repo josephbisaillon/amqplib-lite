@@ -1,8 +1,11 @@
 var amqp = require('amqplib/callback_api');
 var util = require('./rabbit.util.js');
+var utl = require('util');
 var Q = require('q');
+var EventEmitter = require('events');
 var logger = {};
 var registeredHandlers = {};
+
 /**
  * The configuration object that must be passed for an amqp connection string to be properly built
  * @typedef {Object} customLogger
@@ -18,6 +21,7 @@ var registeredHandlers = {};
  * Creates a new Listener instance
  * @constructor
  * @param {customLogger} [customLogger = require('./loggerService.js')] - A custom logger object
+ * @param {Number} maxRetry = number of reconnection attempts before a failure event is emmited by the rabbitclient (default is 10)
  * @example
  * var subscriber = require('amqplib-lite');
  *
@@ -40,10 +44,13 @@ var registeredHandlers = {};
  * });
  *
  */
-function Connect(customLogger) {
+function Connect(customLogger, maxRetry) {
     logger = customLogger || require('./loggerService.js');
-
+    this.maxRetries = maxRetry || 10;
+    this.connectionAttempts = 0;
+    EventEmitter.call(this);
 }
+utl.inherits(Connect, EventEmitter);
 
 /**
  * The configuration object that must be passed for an amqp connection string to be properly built
@@ -80,7 +87,8 @@ Connect.prototype.connect = function (config) {
     var context = this;
 
     return Q.ninvoke(amqp, "connect", util.buildRabbitMqUrl(config)).then(function (conn) {
-        logger.info("Connection in progress...");
+        context.connectionAttempts += 1;
+        logger.trace("Connection in progress...attempts: " + context.connectionAttempts);
 
         conn.on("error", function (err) {
             if (err.message !== "Connection closing") {
@@ -93,27 +101,40 @@ Connect.prototype.connect = function (config) {
         conn.on("close", function () {
             console.error("[AMQP] reconnecting");
             logger.error("[AMQP] reconnecting");
-
-            return setTimeout(function() {
-                context.connect(config).then(function(conn){
-                    context.registerHandlers(context.handlers, conn);
-                })
-            }, 1000);
+            logger.trace('[AMQP] Connection attempts: ' + context.connectionAttempts + ' Maximum attempts: ' + context.maxRetries);
+            if (context.connectionAttempts < context.maxRetries) {
+                return setTimeout(function () {
+                    context.connect(config).then(function (conn) {
+                        context.registerHandlers(context.handlers, conn);
+                    })
+                }, 1000);
+            } else
+            {
+                context.emit('failure', 'failed to connect after ' + context.maxRetries + ' tries.');
+            }
         });
 
         console.log("[AMQP] connected");
         logger.info("[AMQP] has connected successfully");
+        context.connectionAttempts = 0;
         return conn;
 
     }).catch(function (err) {
+        context.connectionAttempts += 1;
         console.error("[AMQP]", err.message);
         logger.error("[AMQP] " + err.message);
-        return setTimeout(function() {
-            context.connect(config).then(function(conn){
-                context.registerHandlers(context.handlers, conn);
-            })
-        }, 1000);
-
+        logger.trace('[AMQP] Connection attempts: ' + context.connectionAttempts + ' Maximum attempts: ' + context.maxRetries);
+        if (context.connectionAttempts < context.maxRetries) {
+            return setTimeout(function () {
+                context.connect(config).then(function (conn) {
+                    context.registerHandlers(context.handlers, conn);
+                })
+            }, 1000);
+        }
+        else
+        {
+            context.emit('failure', 'failed to connect after ' + context.maxRetries + ' tries.');
+        }
     });
 };
 
@@ -190,20 +211,20 @@ Connect.prototype.registerPublisher = function(config, amqpConn){
         logger.info("[AMQP] attempting publisher handshake for new channel to publish on " + config.publisherExchange);
         amqpConn.createChannel(function(err, ch) {
             if (err) {
-            logger.error('no channel');
-            return reject(err);
-        }
-
-        ch.checkExchange(config.publisherExchange, function (err, ok) {
-            if (err) {
-                logger.error('[AMQP] error finding exchange ' + config.publisherExchange);
-            } else {
-                logger.info('[AMQP] success finding exchange ' + config.publisherExchange);
-                resolve(ch);
-
+                logger.error('no channel');
+                return reject(err);
             }
+
+            ch.checkExchange(config.publisherExchange, function (err, ok) {
+                if (err) {
+                    logger.error('[AMQP] error finding exchange ' + config.publisherExchange);
+                } else {
+                    logger.info('[AMQP] success finding exchange ' + config.publisherExchange);
+                    resolve(ch);
+
+                }
+            });
         });
-    });
     });
 };
 
