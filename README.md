@@ -14,7 +14,9 @@ have a message callback function that you pass into it. The callback function fo
 
 2. Publisher functionality
 
-~~3. Test using mock service (TBA)~~
+3. Starting with version 0.2.0 an internal connection pool is maintained within amqplib-lite.
+
+~~4. Test using mock service (TBA)~~
 
 ## Usage
 
@@ -112,6 +114,28 @@ client.connect(config).then((connection) => {
 });
  
 ```
+
+## Internal Connection Pool *new
+
+example
+```
+var rabbitMQ = require('amqplib-lite');
+
+// flushes pool and does not bring the connection back. 
+rabbitMQ.ConnectionPool.flushPoolNoRetry();
+
+
+```
+  getConnectionCount
+  getDeadConnectionCount
+  getConnectionDisplayData
+  removeConnection
+  addHandlerConnPool
+  addConnection
+  flushPoolRetry
+  flushPoolNoRetry
+  reviveConnection
+
 
 ## Contact
 If you have any questions contact Joseph Bisaillon
