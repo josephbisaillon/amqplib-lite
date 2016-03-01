@@ -67,8 +67,7 @@ function guid() {
 
 function findWithAttr(array, attr, value) {
     for(var i = 0; i < array.length; i += 1) {
-        logger.info(array[i][attr]);
-        logger.info(value);
+        logger.trace('[AMQP] ' + array[i][attr] + ' looking for guid: ' + value);
         if(array[i][attr] == value) {
             return i;
         }
@@ -119,7 +118,7 @@ Connect.ConnectionPool = {
                 }
             }
         }
-        logger.trace(JSON.stringify(friendlyObjArray));
+        logger.trace(friendlyObjArray);
         return friendlyObjArray;
     },
     removeConnection: function(guid) {
@@ -276,9 +275,9 @@ Connect.ConnectionPool = {
 
 var ConnectionPoolChanged = function (added){
     if (added) {
-        logger.info('Pool change detected - Connections : ' + Connect.ConnectionPool.Connections.length + ' DeadConnections : ' + Connect.ConnectionPool.DeadConnections.length);
+        logger.trace('Pool change detected - Connections : ' + Connect.ConnectionPool.Connections.length + ' DeadConnections : ' + Connect.ConnectionPool.DeadConnections.length);
     }else {
-        logger.info('Pool change detected - Connections : ' + Connect.ConnectionPool.Connections.length + ' DeadConnections : ' + Connect.ConnectionPool.DeadConnections.length);
+        logger.trace('Pool change detected - Connections : ' + Connect.ConnectionPool.Connections.length + ' DeadConnections : ' + Connect.ConnectionPool.DeadConnections.length);
     }
 };
 
