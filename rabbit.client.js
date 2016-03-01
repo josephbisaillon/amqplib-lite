@@ -119,85 +119,113 @@ Connect.ConnectionPool = {
                 }
             }
         }
-
+        logger.trace(JSON.stringify(friendlyObjArray));
         return friendlyObjArray;
     },
-    getConnections: function (guid) {
-        if (Connect.ConnectionPool.Connections) {
-            var indexFound = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
-            logger.info('index found = ' + indexFound);
-            if (indexFound >= 0){
-                logger.info('index found ' + indexFound);
-                return Connect.ConnectionPool.Connections[indexFound];
-            }
-            else{
-                logger.info('connection not found');
-                logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
-            }
-        } else {
-            logger.info('connection not found');
-            logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
-        }
-    },
     removeConnection: function(guid) {
-        logger.info('remove connection started ' + guid);
+        logger.trace('remove connection started ' + guid);
         if (Connect.ConnectionPool.Connections) {
             var indexFound = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
-            logger.info('index found = ' + indexFound);
             if (indexFound >= 0){
-                logger.info('index found ' + indexFound);
+                logger.trace('connection not found ' + guid);
                 Connect.ConnectionPool.Connections[indexFound].connection.close();
                 Connect.ConnectionPool.DeadConnections.push(Connect.ConnectionPool.Connections[indexFound]);
                 Connect.ConnectionPool.Connections.splice(indexFound,1);
             }
             else{
-                logger.info('connection not found');
-                logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+                logger.trace('connection not found');
+                logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
             }
         } else {
-            logger.info('connection not found');
-            logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+            logger.trace('connection not found');
+            logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+        }
+    },
+    connectionExists: function(guid){
+        logger.info('checking connection existance ' + guid);
+        if (Connect.ConnectionPool.Connections || Connect.ConnectionPool.DeadConnections) {
+            var indexFound = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
+            var indexFoundDead = findWithAttr(Connect.ConnectionPool.DeadConnections, 'guid', guid);
+
+            return (indexFound > -1 || indexFoundDead > -1);
         }
     },
     addHandlerConnPool: function(guid, handler){
-        logger.info('adding handlers to pool connection');
+        logger.trace('adding handlers to pool connection');
         if (Connect.ConnectionPool.Connections) {
             var indexFound = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
-            logger.info('index found = ' + indexFound);
+            logger.trace('index found = ' + indexFound);
             if (indexFound >= 0){
-                logger.info('index found ' + indexFound);
+                logger.trace('index found ' + indexFound);
                 Connect.ConnectionPool.Connections[indexFound].registeredHandlers = handler;
             }
             else{
-                logger.info('connection not found');
-                logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+                logger.trace('connection not found');
+                logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
             }
         } else {
-            logger.info('connection not found');
-            logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+            logger.trace('connection not found');
+            logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
         }
     },
     addConnection: function(client) {
-        logger.info('adding connection running');
+        logger.trace('[AMQP] adding connection running');
         if (Connect.ConnectionPool.DeadConnections) {
             var indexFound = findWithAttr(Connect.ConnectionPool.DeadConnections, 'guid', client.guid);
-            logger.info('index found = ' + indexFound);
             if (indexFound >= 0){
-                logger.info('index found ' + indexFound);
+                logger.trace('[AMQP] connection found removing from dead connections ' + client.guid);
                 Connect.ConnectionPool.DeadConnections.splice(indexFound, 1);
             }
             else{
-                logger.info('connection not found');
-                logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+                logger.trace('[AMQP] connection not found');
+                logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
             }
         } else {
-            logger.info('connection not found');
-            logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+            logger.trace('[AMQP] connection not found');
+            logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
         }
         Connect.ConnectionPool.Connections.push(client);
     },
+    addDeadConnection: function(client){
+        logger.trace('[AMQP] DeadConnection added to pool');
+        Connect.ConnectionPool.DeadConnections.push(client);
+    },
+    getConnection: function(guid){
+        if (Connect.ConnectionPool.Connections) {
+            var indexFound1 = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
+            if (indexFound >= 0){
+                logger.trace('[AMQP] connection found ' + guid);
+                return Connect.ConnectionPool.Connections[indexFound1];
+            }
+        }
+        if (Connect.ConnectionPool.DeadConnections) {
+            var indexFound2 = findWithAttr(Connect.ConnectionPool.DeadConnections, 'guid', guid);
+            if (indexFound2 >= 0){
+                logger.trace('[AMQP] connection found ' + guid);
+                return Connect.ConnectionPool.DeadConnections[indexFound2];
+            }
+        }
+    },
+    removeConnFromAllPools: function(guid){
+        logger.trace('remove connection started ' + guid);
+        if (Connect.ConnectionPool.Connections) {
+            var indexFound1 = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
+            if (indexFound1 >= 0) {
+                logger.trace('[AMQP] connection found ' + guid);
+                Connect.ConnectionPool.Connections.splice(indexFound1, 1);
+            }
+        }
+
+        if (Connect.ConnectionPool.DeadConnections) {
+            var indexFound2 = findWithAttr(Connect.ConnectionPool.DeadConnections, 'guid', guid);
+            if (indexFound2 >= 0) {
+                logger.trace('[AMQP] connection found ' + guid);
+                Connect.ConnectionPool.DeadConnections.splice(indexFound2, 1);
+            }
+        }
+    },
     flushPoolRetry: function () {
-        logger.info('flush pool with retry called');
+        logger.trace('flush pool with retry called');
         Connect.ConnectionPool.retry = true;
 
         if (Connect.ConnectionPool.Connections.length > 0) {
@@ -210,7 +238,7 @@ Connect.ConnectionPool = {
     },
     flushPoolNoRetry: function () {
 
-        logger.info('flush pool no retry called');
+        logger.trace('flush pool no retry called');
         Connect.ConnectionPool.retry = false;
 
         for (i = 0; i < Connect.ConnectionPool.Connections.length; i++) {
@@ -223,26 +251,24 @@ Connect.ConnectionPool = {
     },
     reviveConnection: function(guid) {
         var context = this;
-        logger.info('revive connection');
+        logger.trace('[AMQP] Revive connection ' + guid);
         if (Connect.ConnectionPool.DeadConnections) {
             var indexFound = findWithAttr(Connect.ConnectionPool.DeadConnections, 'guid', guid);
-            logger.info('index found = ' + indexFound);
             if (indexFound >= 0){
-                logger.info('index found ' + indexFound);
+                logger.trace('[AMQP] Connection found ' + guid);
 
                 var client = Connect.ConnectionPool.DeadConnections[indexFound];
                 client.connect(client.configInternal).then(function (conn) {
                     client.registerHandlers(client.registeredHandlers);
                 });
-                //Connect.ConnectionPool.DeadConnections.splice(indexFound,1);
             }
             else{
-                logger.info('connection not found');
-                logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+                logger.trace('[AMQP] connection not found');
+                logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
             }
         } else {
-            logger.info('connection not found');
-            logger.info(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+            logger.trace('[AMQP] connection not found');
+            logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
         }
 
     }
@@ -297,11 +323,9 @@ Connect.prototype.connect = function (config) {
     var context = this;
     context.configInternal = config;
 
-
-
-    return Q.ninvoke(amqp, "connect", util.buildRabbitMqUrl(config)).then(function (conn, err) {
+    return Q.ninvoke(amqp, "connect", util.buildRabbitMqUrl(context.configInternal)).then(function (conn, err) {
         if (err){
-            logger.info('caught exception');
+            logger.error('[AMQP] caught exception');
         }
 
         context.connectionAttempts += 1;
@@ -312,21 +336,19 @@ Connect.prototype.connect = function (config) {
                 logger.error("[AMQP] conn error", err);
                 conn.close();
             }
-            if (err)
-            {
-                logger.error('bad stuff has happened');
-            }
         });
         conn.on("close", function (err) {
-            logger.error("[AMQP] reconnecting");
-            logger.info('[AMQP] Connection attempts: ' + context.connectionAttempts + ' Maximum attempts: ' + context.maxRetries);
             logger.error(err);
+
+            logger.trace("[AMQP] reconnecting");
+            logger.info('[AMQP] Connection attempts: ' + context.connectionAttempts + ' Maximum attempts: ' + context.maxRetries);
+
             var serverDisconnect = false;
 
             if (err){
                 var substring = '320';
                 if (err.indexOf(substring) > -1){
-                    logger.info('Connection has been force closed by the server');
+                    logger.trace('[AMQP] Connection has been force closed by the server');
                     serverDisconnect = true;
                 }
             }
@@ -335,7 +357,7 @@ Connect.prototype.connect = function (config) {
 
 
             if ((context.connectionAttempts < context.maxRetries && Connect.ConnectionPool.retry) || serverDisconnect) {
-                logger.info('made it inside of attempts' + Connect.ConnectionPool.retry + ' ' + serverDisconnect);
+                logger.trace('[AMQP] retry?: ' + Connect.ConnectionPool.retry + ' disconnect came from server?: ' + serverDisconnect);
                 return setTimeout(function () {
                     context.connect(config).then(function (conn) {
                         context.registerHandlers(context.registeredHandlers);
@@ -345,25 +367,25 @@ Connect.prototype.connect = function (config) {
             else
             {
                 context.emit('failure', 'failed to connect after ' + context.maxRetries + ' tries.');
+                logger.trace('[AMQP] done retrying')
             }
         });
 
-        logger.info("[AMQP] has connected successfully");
+        logger.info("[AMQP] has successfully created a connection");
         context.connectionAttempts = 0;
         context.channelAttempts = 0;
         Connect.ConnectionPool.removeConnection(context.guid);
         Connect.ConnectionPool.addConnection(context);
         context.connection = conn;
-        logger.info('New connection added new count : ' + Connect.ConnectionPool.Connections.length);
+        logger.trace('New connection added new count : ' + Connect.ConnectionPool.Connections.length);
         return conn;
 
     }).catch(function (err) {
         context.connectionAttempts += 1;
-        console.error("[AMQP]", err.message);
         logger.error("[AMQP] " + err.message);
         logger.trace('[AMQP] Connection attempts: ' + context.connectionAttempts + ' Maximum attempts: ' + context.maxRetries);
         if (context.connectionAttempts < context.maxRetries) {
-            logger.info('attempting reconnect');
+            logger.trace('[AMQP] attempting reconnect');
             return setTimeout(function () {
                 context.connect(config).then(function (conn) {
                     context.registerHandlers(context.handlers);
@@ -373,6 +395,8 @@ Connect.prototype.connect = function (config) {
         else
         {
             context.emit('failure', 'failed to connect after ' + context.maxRetries + ' tries.');
+            Connect.ConnectionPool.removeConnFromAllPools(context.guid);
+            Connect.ConnectionPool.addDeadConnection(context);
         }
     });
 };
@@ -394,16 +418,14 @@ Connect.prototype.setUpListener = function(messageRate) {
     return Q.ninvoke(context.connection, 'createChannel').then(function (ch) {
 
         ch.on("error", function (err) {
-            console.error("[AMQP] channel error", err);
             logger.error("[AMQP] channel error " + err);
         });
         ch.on("close", function () {
-            console.log("[AMQP] Channel closed");
-            logger.info("[AMQP] Channel closed");
+            logger.error("[AMQP] Channel closed");
             context.channelAttempts = context.channelAttempts + 1;
             if (context.maxChannelRetries > context.channelAttempts) {
-                logger.info('retry channel connection again');
-                logger.info(context.maxChannelRetries + ' attempts: ' + context.channelAttempts);
+                logger.trace('[AMQP] retry channel connection again');
+                logger.trace('[AMQP] ' + context.maxChannelRetries + ' attempts: ' + context.channelAttempts);
                 context.registerHandlers(context.registeredHandlers);
             } else {
                 logger.info('You have exceeded the maximum channel retry, closing connection');
@@ -411,11 +433,11 @@ Connect.prototype.setUpListener = function(messageRate) {
                 Connect.ConnectionPool.removeConnection(context.guid);
             }
         });
-        logger.info("[AMQP] Channel prefetch rate set to " + messageRate);
+        logger.trace("[AMQP] Channel prefetch rate set to " + messageRate);
         ch.prefetch(messageRate); // limit the number of messages that are read to 1, once the server receives an acknowledgement back it will then send another
         return ch;
     });
-}
+};
 
 /**
  * This function should be fired when the main amqp connection has been fired
@@ -424,30 +446,21 @@ Connect.prototype.setUpListener = function(messageRate) {
  */
 Connect.prototype.registerHandlers = function (handlers) {
     var context = this;
-    context.registeredHandlers = handlers;
-    logger.info(handlers);
-    logger.info("[AMQP] Beginning channel connections");
+    context.registeredHandlers = handlers || context.registeredHandlers;
+    logger.trace("[AMQP] Beginning channel connections");
 
     Connect.ConnectionPool.addHandlerConnPool(context.guid, handlers);
 
-    //registeredHandlers = handlers;
-    // if(registeredHandlers){
-    //  logger.debug("[AMQP] Set handlers " ,JSON.stringify(registeredHandlers));
-    //}
-    logger.info(handlers);
-    logger.info(context.registeredHandlers);
     context.registeredHandlers.forEach(function (handler) {
-        logger.info("[AMQP] attempting queue listener handshake for " + handler.queueConfig);
+        logger.trace("[AMQP] attempting queue listener handshake for " + handler.queueConfig);
         context.setUpListener(handler.messageRate)
             .then(function (ch) {
-                logger.info("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
+                logger.trace("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
                 ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
 
             }).catch(function (err) {
             if (err) {
-                console.log(err);
-                logger.fatal("[AMQP] " + err.message);
-
+                logger.error("[AMQP] " + err.message);
             }
         });
     });
@@ -461,8 +474,8 @@ Connect.prototype.registerHandlers = function (handlers) {
  */
 Connect.prototype.registerPublisher = function(config, amqpConn){
     return new Promise(function(resolve, reject) {
-        logger.info("[AMQP] Beginning publisher connections");
-        logger.info("[AMQP] attempting publisher handshake for new channel to publish on " + config.publisherExchange);
+        logger.trace("[AMQP] Beginning publisher connections");
+        logger.trace("[AMQP] attempting publisher handshake for new channel to publish on " + config.publisherExchange);
         amqpConn.createChannel(function(err, ch) {
             if (err) {
                 logger.error('no channel');
@@ -473,7 +486,7 @@ Connect.prototype.registerPublisher = function(config, amqpConn){
                 if (err) {
                     logger.error('[AMQP] error finding exchange ' + config.publisherExchange);
                 } else {
-                    logger.info('[AMQP] success finding exchange ' + config.publisherExchange);
+                    logger.trace('[AMQP] success finding exchange ' + config.publisherExchange);
                     resolve(ch);
 
                 }
