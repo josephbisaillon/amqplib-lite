@@ -118,7 +118,7 @@ Connect.ConnectionPool = {
                 }
             }
         }
-        logger.trace(friendlyObjArray);
+
         return friendlyObjArray;
     },
     removeConnection: function(guid) {
