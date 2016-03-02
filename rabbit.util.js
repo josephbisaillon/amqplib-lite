@@ -41,8 +41,6 @@ function buildRabbitMqUrl(config){
     if((config.rabbitmqusername + config.rabbitmqpassword) != ''){
         auth = config.rabbitmqusername + ':' + config.rabbitmqpassword + '@';
     }
-
-    console.log('amqp://' + auth + config.rabbitmqserver + ':' + config.rabbitmqport + '/' + config.vhost + '?heartbeat=' + heartbeat);
     return 'amqp://' + auth + config.rabbitmqserver + ':' + config.rabbitmqport + '/' + config.vhost + '?heartbeat=' + heartbeat;
 }
 
@@ -64,7 +62,6 @@ function IsJsonString(str) {
     try {
         JSON.parse(str);
     } catch (e) {
-        console.log('error', e.stack);
         return false;
     }
     return true;
