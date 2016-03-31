@@ -50,8 +50,11 @@ function Connect(customLogger, maxRetry) {
     this.maxChannelRetries = maxRetry || 10;
     this.connectionAttempts = 0;
     this.channelAttempts = 0;
+    this.publishExchange = {};
+    this.publishChannel = {};
     this.connection = {};
     this.registeredHandlers = [];
+    this.registeredPublishers = [];
     this.configInternal = {};
     EventEmitter.call(this);
 }
@@ -103,6 +106,24 @@ Connect.ConnectionPool = {
             }
         }
 
+        if (Connect.ConnectionPool.Connections.length > 0) {
+            for (i = 0; i < Connect.ConnectionPool.Connections.length; i++) {
+                if (Connect.ConnectionPool.Connections[i].registeredHandlers.length < 1) {
+                    Connect.ConnectionPool.Connections[i].registeredPublishers.forEach(function (publisher) {
+                        logger.trace('looping through registered publishers');
+                        logger.trace(publisher);
+                        var friendlyObj = {
+                            guid: Connect.ConnectionPool.Connections[i].guid,
+                            queueConfig: publisher,
+                            messageRate: 0,
+                            status: 'Alive'
+                        };
+                        friendlyObjArray.push(friendlyObj);
+                    });
+                }
+            }
+        }
+
         if (Connect.ConnectionPool.DeadConnections.length > 0) {
             for (i = 0; i < Connect.ConnectionPool.DeadConnections.length; i++) {
                 if (Connect.ConnectionPool.DeadConnections[i].registeredHandlers) {
@@ -111,6 +132,24 @@ Connect.ConnectionPool = {
                             guid: Connect.ConnectionPool.DeadConnections[i].guid,
                             queueConfig: handler.queueConfig,
                             messageRate: handler.messageRate,
+                            status: 'Dead'
+                        };
+                        friendlyObjArray.push(friendlyObj);
+                    });
+                }
+            }
+        }
+
+        if (Connect.ConnectionPool.DeadConnections.length > 0) {
+            for (i = 0; i < Connect.ConnectionPool.DeadConnections.length; i++) {
+                if (Connect.ConnectionPool.DeadConnections[i].registeredHandlers.length < 1) {
+                    Connect.ConnectionPool.DeadConnections[i].registeredPublishers.forEach(function (publisher) {
+                        logger.trace('looping through registered publishers');
+                        logger.trace(publisher);
+                        var friendlyObj = {
+                            guid: Connect.ConnectionPool.DeadConnections[i].guid,
+                            queueConfig: publisher,
+                            messageRate: 0,
                             status: 'Dead'
                         };
                         friendlyObjArray.push(friendlyObj);
@@ -141,7 +180,7 @@ Connect.ConnectionPool = {
         }
     },
     connectionExists: function(guid){
-        logger.info('checking connection existance ' + guid);
+        logger.trace('checking connection existance ' + guid);
         if (Connect.ConnectionPool.Connections || Connect.ConnectionPool.DeadConnections) {
             var indexFound = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
             var indexFoundDead = findWithAttr(Connect.ConnectionPool.DeadConnections, 'guid', guid);
@@ -188,6 +227,45 @@ Connect.ConnectionPool = {
     addDeadConnection: function(client){
         logger.trace('[AMQP] DeadConnection added to pool');
         Connect.ConnectionPool.DeadConnections.push(client);
+    },
+    addPublisherConnections: function(guid, publishers, ch){
+        logger.trace('adding handlers to pool connection');
+        if (Connect.ConnectionPool.Connections) {
+            var indexFound = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
+            logger.trace('index found = ' + indexFound);
+            if (indexFound >= 0){
+                logger.trace('index found ' + indexFound);
+                Connect.ConnectionPool.Connections[indexFound].registeredPublishers = publishers;
+                Connect.ConnectionPool.Connections[indexFound].publisherChannel = ch;
+                logger.trace(Connect.ConnectionPool.Connections[indexFound].registeredPublishers);
+            }
+            else{
+                logger.trace('connection not found');
+                logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+            }
+        } else {
+            logger.trace('connection not found');
+            logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+        }
+    },
+    getConnectionByExchange: function(exchange){
+        logger.trace('Checking for connection with exchange : ' + exchange);
+        if (Connect.ConnectionPool.Connections) {
+            var indexFound = findWithAttr(Connect.ConnectionPool.Connections, 'exchange', exchange);
+            if (indexFound >= 0){
+                logger.trace('connection not found ' + guid);
+                Connect.ConnectionPool.Connections[indexFound].connection.close();
+                Connect.ConnectionPool.DeadConnections.push(Connect.ConnectionPool.Connections[indexFound]);
+                Connect.ConnectionPool.Connections.splice(indexFound,1);
+            }
+            else{
+                logger.trace('connection not found');
+                logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+            }
+        } else {
+            logger.trace('connection not found');
+            logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+        }
     },
     getConnection: function(guid){
         if (Connect.ConnectionPool.Connections) {
@@ -259,6 +337,7 @@ Connect.ConnectionPool = {
                 var client = Connect.ConnectionPool.DeadConnections[indexFound];
                 client.connect(client.configInternal).then(function (conn) {
                     client.registerHandlers(client.registeredHandlers);
+                    client.registerPublishers(client.registeredPublishers);
                 });
             }
             else{
@@ -270,6 +349,31 @@ Connect.ConnectionPool = {
             logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
         }
 
+    },
+    publishMessageToExchange: function(exchange, auditkey, message){
+        logger.trace('publishing to exchange started');
+        if (Connect.ConnectionPool.Connections.length > 0) {
+            for (i = 0; i < Connect.ConnectionPool.Connections.length; i++) {
+                if (Connect.ConnectionPool.Connections[i].registeredPublishers.length > 0){
+                    logger.trace('found a registered publisher');
+                    Connect.ConnectionPool.Connections[i].registeredPublishers.forEach(function (publisher) {
+                        if (publisher === exchange){
+                            logger.trace('found publisher on this connection, beginning publishing');
+                            // channel of publisher exists on the 0 index of publishers
+                            var ok = Connect.ConnectionPool.Connections[i].publisherChannel.publish(exchange, auditkey, new Buffer(message));
+                            if (ok){
+                                logger.trace('Success message has been sent, remember this is fire and forget it may still have errors during transports');
+                            }else{
+                                logger.error('Error publishing to exchange ', exchange, auditkey, response);
+                            }
+                        }
+                    });
+                }
+            }
+
+        }else{
+            logger.error('no live connections to publish on');
+        }
     }
 };
 
@@ -360,6 +464,7 @@ Connect.prototype.connect = function (config) {
                 return setTimeout(function () {
                     context.connect(config).then(function (conn) {
                         context.registerHandlers(context.registeredHandlers);
+                        context.registerPublishers(context.registeredPublishers);
                     })
                 }, 1000);
             }
@@ -388,6 +493,7 @@ Connect.prototype.connect = function (config) {
             return setTimeout(function () {
                 context.connect(config).then(function (conn) {
                     context.registerHandlers(context.handlers);
+                    context.registerPublishers(context.registeredPublishers);
                 })
             }, 1000);
         }
@@ -471,26 +577,18 @@ Connect.prototype.registerHandlers = function (handlers) {
  * @param config
  * @param amqpConn
  */
-Connect.prototype.registerPublisher = function(config, amqpConn){
-    return new Promise(function(resolve, reject) {
-        logger.trace("[AMQP] Beginning publisher connections");
-        logger.trace("[AMQP] attempting publisher handshake for new channel to publish on " + config.publisherExchange);
-        amqpConn.createChannel(function(err, ch) {
-            if (err) {
-                logger.error('no channel');
-                return reject(err);
-            }
+Connect.prototype.registerPublishers = function(config){
+    var context = this;
+    logger.trace("[AMQP] Tieing publishers to this connection - GUID:" + context.guid);
+    context.registeredPublishers = config || context.registeredPublishers;
 
-            ch.checkExchange(config.publisherExchange, function (err, ok) {
-                if (err) {
-                    logger.error('[AMQP] error finding exchange ' + config.publisherExchange);
-                } else {
-                    logger.trace('[AMQP] success finding exchange ' + config.publisherExchange);
-                    resolve(ch);
-
-                }
-            });
-        });
+    context.connection.createChannel(function(err, ch) {
+        if (err) {
+            logger.error('[AMQP] no was properly opened for publishers on connection');
+        } else {
+            logger.trace('[AMQP] Channel was created and added to publishers connection');
+            Connect.ConnectionPool.addPublisherConnections(context.guid, context.registeredPublishers, ch);
+        }
     });
 };
 
