@@ -54,6 +54,7 @@ function Connect(customLogger, maxRetry) {
     this.publishChannel = {};
     this.connection = {};
     this.registeredHandlers = [];
+    this.channels = [];
     this.registeredPublishers = [];
     this.configInternal = {};
     EventEmitter.call(this);
@@ -166,6 +167,7 @@ Connect.ConnectionPool = {
             var indexFound = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
             if (indexFound >= 0){
                 logger.trace('connection not found ' + guid);
+                Connect.ConnectionPool.Connections[indexFound].channels = [];
                 Connect.ConnectionPool.Connections[indexFound].connection.close();
                 Connect.ConnectionPool.DeadConnections.push(Connect.ConnectionPool.Connections[indexFound]);
                 Connect.ConnectionPool.Connections.splice(indexFound,1);
@@ -257,6 +259,24 @@ Connect.ConnectionPool = {
                 Connect.ConnectionPool.Connections[indexFound].connection.close();
                 Connect.ConnectionPool.DeadConnections.push(Connect.ConnectionPool.Connections[indexFound]);
                 Connect.ConnectionPool.Connections.splice(indexFound,1);
+            }
+            else{
+                logger.trace('connection not found');
+                logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+            }
+        } else {
+            logger.trace('connection not found');
+            logger.trace(Connect.ConnectionPool.Connections.length + ' Connections exist in the pool');
+        }
+    },
+    addchannel: function(guid,ch){
+        logger.trace('adding channel to pool connection');
+        if (Connect.ConnectionPool.Connections) {
+            var indexFound = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
+            logger.trace('index found = ' + indexFound);
+            if (indexFound >= 0){
+                logger.trace('index found ' + indexFound);
+                Connect.ConnectionPool.Connections[indexFound].channels.push(ch);
             }
             else{
                 logger.trace('connection not found');
@@ -378,7 +398,24 @@ Connect.ConnectionPool = {
         }
     },
     ackMessage: function (msg, ackStatus, queue){
+        logger.trace('publishing to exchange started');
+        if (Connect.ConnectionPool.Connections.length > 0) {
+            for (i = 0; i < Connect.ConnectionPool.Connections.length; i++) {
+                if (Connect.ConnectionPool.Connections[i].channels.length > 0){
+                    logger.trace('found a channel');
+                    Connect.ConnectionPool.Connections[i].channels.forEach(function (channel) {
+                        if (queue === channel.queueConfig){
+                            logger.trace('found a channel for queue ' + queue);
+                            channel.ack(msg,ackStatus);
+                        }
+                    });
+                }
+            }
 
+        }else{
+            logger.error('no live connections to publish on');
+            return false;
+        }
     }
 };
 
@@ -567,9 +604,10 @@ Connect.prototype.registerHandlers = function (handlers) {
         context.setUpListener(handler.messageRate)
             .then(function (ch) {
                 logger.trace("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
-                 ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
-               // ch.consume(handler.queueConfig, handler.handlerFunction, {noAck: false});
-
+                //  ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
+                ch.consume(handler.queueConfig, handler.handlerFunction, {noAck: false});
+                ch.queueConfig = handler.queueConfig;
+                Connect.ConnectionPool.addchannel(context.guid, ch);
             }).catch(function (err) {
             if (err) {
                 logger.error("[AMQP] " + err.message);
