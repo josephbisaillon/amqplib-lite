@@ -366,6 +366,7 @@ Connect.ConnectionPool = {
                             }else{
                                 logger.error('Error publishing to exchange ', exchange, auditkey, response);
                             }
+                            return ok;
                         }
                     });
                 }
@@ -373,7 +374,11 @@ Connect.ConnectionPool = {
 
         }else{
             logger.error('no live connections to publish on');
+            return false;
         }
+    },
+    ackMessage: function (msg, ackStatus, queue){
+
     }
 };
 
@@ -533,9 +538,10 @@ Connect.prototype.setUpListener = function(messageRate) {
                 logger.trace('[AMQP] ' + context.maxChannelRetries + ' attempts: ' + context.channelAttempts);
                 context.registerHandlers(context.registeredHandlers);
             } else {
-                logger.info('You have exceeded the maximum channel retry, closing connection');
+                logger.info('You have exceeded the maximum channel retry, not closing channel');
                 context.connectionAttempts = context.maxRetries;
-                Connect.ConnectionPool.removeConnection(context.guid);
+                // no longer removing connecting during channel failures
+                // Connect.ConnectionPool.removeConnection(context.guid);
             }
         });
         logger.trace("[AMQP] Channel prefetch rate set to " + messageRate);
@@ -561,7 +567,8 @@ Connect.prototype.registerHandlers = function (handlers) {
         context.setUpListener(handler.messageRate)
             .then(function (ch) {
                 logger.trace("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
-                ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
+                 ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
+               // ch.consume(handler.queueConfig, handler.handlerFunction, {noAck: false});
 
             }).catch(function (err) {
             if (err) {
