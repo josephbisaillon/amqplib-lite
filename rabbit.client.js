@@ -372,6 +372,7 @@ Connect.ConnectionPool = {
     },
     publishMessageToExchange: function(exchange, auditkey, message){
         logger.trace('publishing to exchange started');
+        var ok;
         if (Connect.ConnectionPool.Connections.length > 0) {
             for (i = 0; i < Connect.ConnectionPool.Connections.length; i++) {
                 if (Connect.ConnectionPool.Connections[i].registeredPublishers.length > 0){
@@ -380,13 +381,8 @@ Connect.ConnectionPool = {
                         if (publisher === exchange){
                             logger.trace('found publisher on this connection, beginning publishing');
                             // channel of publisher exists on the 0 index of publishers
-                            var ok = Connect.ConnectionPool.Connections[i].publisherChannel.publish(exchange, auditkey, new Buffer(message));
-                            if (ok){
-                                logger.trace('Success message has been sent, remember this is fire and forget it may still have errors during transports');
-                            }else{
-                                logger.error('Error publishing to exchange ', exchange, auditkey, response);
-                            }
-                            return ok;
+                            ok = Connect.ConnectionPool.Connections[i].publisherChannel.publish(exchange, auditkey, new Buffer(message));
+                            logger.trace('message publish ' + ok);
                         }
                     });
                 }
@@ -394,8 +390,8 @@ Connect.ConnectionPool = {
 
         }else{
             logger.error('no live connections to publish on');
-            return false;
         }
+        return ok;
     },
     ackMessage: function (msg, ackStatus, queue){
         logger.trace('publishing to exchange started');
