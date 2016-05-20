@@ -321,6 +321,21 @@ Connect.ConnectionPool = {
             }
         }
     },
+    flushConnRetry:function(guid){
+        logger.trace('flush pool with retry called for guid');
+        Connect.ConnectionPool.retry = true;
+
+        logger.trace('remove connection started ' + guid);
+        if (Connect.ConnectionPool.Connections) {
+            var indexFound1 = findWithAttr(Connect.ConnectionPool.Connections, 'guid', guid);
+            if (indexFound1 >= 0) {
+                logger.trace('[AMQP] connection found ' + guid);
+                Connect.ConnectionPool.Connections[indexFound1].connection.close();
+                Connect.ConnectionPool.DeadConnections.push(Connect.ConnectionPool.Connections[indexFound1]);
+                Connect.ConnectionPool.Connections.splice(indexFound1, 1);
+            }
+        }
+    },
     flushPoolRetry: function () {
         logger.trace('flush pool with retry called');
         Connect.ConnectionPool.retry = true;
@@ -573,8 +588,9 @@ Connect.prototype.setUpListener = function(messageRate) {
             } else {
                 logger.info('You have exceeded the maximum channel retry, not closing channel');
                 context.connectionAttempts = context.maxRetries;
-                // no longer removing connecting during channel failures
-                // Connect.ConnectionPool.removeConnection(context.guid);
+                // retry the connection forever
+                Connect.ConnectionPool.flushPoolRetry(context.guid);
+
             }
         });
         logger.trace("[AMQP] Channel prefetch rate set to " + messageRate);
@@ -600,8 +616,8 @@ Connect.prototype.registerHandlers = function (handlers) {
         context.setUpListener(handler.messageRate)
             .then(function (ch) {
                 logger.trace("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
-                //  ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
-                ch.consume(handler.queueConfig, handler.handlerFunction, {noAck: false});
+                ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
+               // ch.consume(handler.queueConfig, handler.handlerFunction, {noAck: false});
                 ch.queueConfig = handler.queueConfig;
                 Connect.ConnectionPool.addchannel(context.guid, ch);
             }).catch(function (err) {
