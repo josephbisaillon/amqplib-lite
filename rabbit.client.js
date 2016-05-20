@@ -616,8 +616,8 @@ Connect.prototype.registerHandlers = function (handlers) {
         context.setUpListener(handler.messageRate)
             .then(function (ch) {
                 logger.trace("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
-                ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
-               // ch.consume(handler.queueConfig, handler.handlerFunction, {noAck: false});
+               // ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
+                ch.consume(handler.queueConfig, handler.handlerFunction, {noAck: false});
                 ch.queueConfig = handler.queueConfig;
                 Connect.ConnectionPool.addchannel(context.guid, ch);
             }).catch(function (err) {
