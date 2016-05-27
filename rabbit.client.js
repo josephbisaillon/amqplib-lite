@@ -409,7 +409,7 @@ Connect.ConnectionPool = {
         return ok;
     },
     ackMessage: function (msg, ackStatus, queue){
-        logger.trace('publishing to exchange started');
+        logger.trace('acking started');
         if (Connect.ConnectionPool.Connections.length > 0) {
             for (i = 0; i < Connect.ConnectionPool.Connections.length; i++) {
                 if (Connect.ConnectionPool.Connections[i].channels.length > 0){
@@ -425,7 +425,25 @@ Connect.ConnectionPool = {
 
         }else{
             logger.error('no live connections to publish on');
-            return false;
+        }
+    },
+    nackMessage: function (msg, ackStatus, queue){
+        logger.trace(' started');
+        if (Connect.ConnectionPool.Connections.length > 0) {
+            for (i = 0; i < Connect.ConnectionPool.Connections.length; i++) {
+                if (Connect.ConnectionPool.Connections[i].channels.length > 0){
+                    logger.trace('found a channel');
+                    Connect.ConnectionPool.Connections[i].channels.forEach(function (channel) {
+                        if (queue === channel.queueConfig){
+                            logger.trace('found a channel for queue ' + queue);
+                            channel.reject(msg, ackStatus);
+                        }
+                    });
+                }
+            }
+
+        }else{
+            logger.error('no channel found');
         }
     }
 };
@@ -616,7 +634,7 @@ Connect.prototype.registerHandlers = function (handlers) {
         context.setUpListener(handler.messageRate)
             .then(function (ch) {
                 logger.trace("[AMQP] Success handshake complete, listening on " + handler.queueConfig);
-               // ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
+                // ch.consume(handler.queueConfig, handler.handlerFunction.bind(ch), {noAck: false});
                 ch.consume(handler.queueConfig, handler.handlerFunction, {noAck: false});
                 ch.queueConfig = handler.queueConfig;
                 Connect.ConnectionPool.addchannel(context.guid, ch);
