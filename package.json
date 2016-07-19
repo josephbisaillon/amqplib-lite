@@ -1,6 +1,6 @@
 {
   "name": "amqplib-lite",
-  "version": "0.4.1",
+  "version": "5.0.0",
   "description": "A modular implementation of the amqplib. Dependencies are  hard versioned for stability, upgrade at your own risk.",
   "main": "rabbit.client.js",
   "author": {
@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "amqplib": "0.4.0",
+    "lodash": "^4.13.1",
     "q": "1.4.1"
   },
   "devDependencies": {
