@@ -49,8 +49,9 @@ function getCount(status) {
 function getConnectionDisplayData() {
     var friendlyObjArray = [];
 
+    var i = 0;
     if (Connections.length > 0) {
-        for (var i = 0; i < Connections.length; i++) {
+        for ( i = 0; i < Connections.length; i++) {
             if (Connections[i].registeredHandlers) {
                 Connections[i].registeredHandlers.forEach(function (handler) {
                     var friendlyObj = {
