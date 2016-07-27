@@ -50,7 +50,7 @@ function getConnectionDisplayData() {
     var friendlyObjArray = [];
 
     if (Connections.length > 0) {
-        for (i = 0; i < Connections.length; i++) {
+        for (var i = 0; i < Connections.length; i++) {
             if (Connections[i].registeredHandlers) {
                 Connections[i].registeredHandlers.forEach(function (handler) {
                     var friendlyObj = {
@@ -66,7 +66,7 @@ function getConnectionDisplayData() {
     }
 
     if (Connections.length > 0) {
-        for (i = 0; i < Connections.length; i++) {
+        for ( i = 0; i < Connections.length; i++) {
             if (Connections[i].registeredHandlers.length < 1) {
                 Connections[i].registeredPublishers.forEach(function (publisher) {
                     console.log('looping through registered publishers');
@@ -84,7 +84,7 @@ function getConnectionDisplayData() {
     }
 
     if (DeadConnections.length > 0) {
-        for (i = 0; i < DeadConnections.length; i++) {
+        for ( i = 0; i < DeadConnections.length; i++) {
             if (DeadConnections[i].registeredHandlers) {
                 DeadConnections[i].registeredHandlers.forEach(function (handler) {
                     var friendlyObj = {
