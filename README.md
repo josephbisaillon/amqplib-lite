@@ -1,5 +1,7 @@
 # RabbitMQ Integration services
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/josephbisaillon/amqplib-lite.svg)](https://greenkeeper.io/)
+
 Use this lightweight library to integrate with rabbitmq. 
 
 All implementation is built into the listener service.
